@@ -1,0 +1,11 @@
+moviepy==1.0.3
+openai-whisper==20231117
+elevenlabs==0.2.26
+python-dotenv==1.0.0
+ffmpeg-python==0.2.0
+numpy==1.24.3
+torch==2.1.2
+fastapi==0.110.0
+uvicorn==0.28.0
+python-multipart==0.0.9
+websockets==12.0 
