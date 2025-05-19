@@ -3,7 +3,7 @@
   import { fetchVoices } from '$lib/api';
   
   export let apiKey = '';
-  export let selectedVoiceId = '21m00Tcm4TlvDq8ikWAM'; // Default Rachel voice
+  export let selectedVoiceId = 'uYkKk3J4lEp7IHQ8CLBi'; // Default Justin voice
   
   let voices = [];
   let loading = false;

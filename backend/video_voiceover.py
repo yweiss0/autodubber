@@ -21,8 +21,8 @@ if not ELEVENLABS_API_KEY:
 
 set_api_key(ELEVENLABS_API_KEY)
 
-# Default voice ID - Rachel
-DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel voice ID
+# Default voice ID - Justin
+DEFAULT_VOICE_ID = "uYkKk3J4lEp7IHQ8CLBi"  # Justin voice ID
 
 # Voice settings
 VOICE_SETTINGS = VoiceSettings(

@@ -498,6 +498,63 @@ async def process_video(
             # Allow other tasks to run
             await asyncio.sleep(0.1)
 
+            # Copy SRT file to outputs folder for easy access
+            srt_path = os.path.join(TEMP_DIR, f"{job_id}_subtitles.srt")
+            output_srt_path = os.path.join(OUTPUT_DIR, f"{job_id}_subtitles.srt")
+            if os.path.exists(srt_path):
+                try:
+                    shutil.copy2(srt_path, output_srt_path)
+                    logger.info(
+                        f"[Job {job_id}] Copied SRT file to outputs folder: {output_srt_path}"
+                    )
+                except Exception as e:
+                    logger.error(f"[Job {job_id}] Error copying SRT file: {str(e)}")
+
+            # Clean up temporary files
+            try:
+                logger.info(f"[Job {job_id}] Cleaning up temporary files")
+
+                # Clean temporary segment files
+                segment_files = [
+                    f
+                    for f in os.listdir(TEMP_DIR)
+                    if f.startswith(f"segment_") and f.endswith(".mp3")
+                ]
+                for file in segment_files:
+                    try:
+                        os.remove(os.path.join(TEMP_DIR, file))
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing temp file {file}: {str(e)}"
+                        )
+
+                # Clean temporary job files in temp directory
+                temp_job_files = [
+                    f for f in os.listdir(TEMP_DIR) if f.startswith(f"{job_id}_")
+                ]
+                for file in temp_job_files:
+                    try:
+                        os.remove(os.path.join(TEMP_DIR, file))
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing temp file {file}: {str(e)}"
+                        )
+
+                # Clean uploaded video in uploads directory
+                if os.path.exists(video_path):
+                    try:
+                        os.remove(video_path)
+                        logger.info(
+                            f"[Job {job_id}] Removed original upload file: {video_path}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing upload file: {str(e)}"
+                        )
+
+            except Exception as e:
+                logger.error(f"[Job {job_id}] Error during cleanup: {str(e)}")
+
             # Mark job as completed
             logger.info(f"[Job {job_id}] Processing completed successfully")
             update_job_status(
@@ -507,6 +564,7 @@ async def process_video(
                 finished_at=datetime.now().isoformat(),
                 video_path=f"/media/outputs/{job_id}_output.mp4",
                 audio_path=f"/media/outputs/{job_id}_audio_only.mp3",
+                srt_path=f"/media/outputs/{job_id}_subtitles.srt",
                 speed_factor=speed_factor,
                 current_activity="Processing completed successfully",
             )
@@ -714,7 +772,7 @@ async def keep_connection_alive(websocket: WebSocket, job_id: str):
 async def upload_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    voice_id: str = Form("21m00Tcm4TlvDq8ikWAM"),  # Rachel voice default
+    voice_id: str = Form("uYkKk3J4lEp7IHQ8CLBi"),  # Justin voice default
     elevenlabs_api_key: str = Form(None),
     speed_factor: float = Form(1.0),  # Default speed factor (1.0 = normal speed)
     xi_api_key: str = Header(None, alias="xi-api-key"),
@@ -973,6 +1031,63 @@ async def continue_video_processing(
             # Allow other tasks to run
             await asyncio.sleep(0.1)
 
+            # Copy SRT file to outputs folder for easy access
+            srt_path = os.path.join(TEMP_DIR, f"{job_id}_subtitles.srt")
+            output_srt_path = os.path.join(OUTPUT_DIR, f"{job_id}_subtitles.srt")
+            if os.path.exists(srt_path):
+                try:
+                    shutil.copy2(srt_path, output_srt_path)
+                    logger.info(
+                        f"[Job {job_id}] Copied SRT file to outputs folder: {output_srt_path}"
+                    )
+                except Exception as e:
+                    logger.error(f"[Job {job_id}] Error copying SRT file: {str(e)}")
+
+            # Clean up temporary files
+            try:
+                logger.info(f"[Job {job_id}] Cleaning up temporary files")
+
+                # Clean temporary segment files
+                segment_files = [
+                    f
+                    for f in os.listdir(TEMP_DIR)
+                    if f.startswith(f"segment_") and f.endswith(".mp3")
+                ]
+                for file in segment_files:
+                    try:
+                        os.remove(os.path.join(TEMP_DIR, file))
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing temp file {file}: {str(e)}"
+                        )
+
+                # Clean temporary job files in temp directory
+                temp_job_files = [
+                    f for f in os.listdir(TEMP_DIR) if f.startswith(f"{job_id}_")
+                ]
+                for file in temp_job_files:
+                    try:
+                        os.remove(os.path.join(TEMP_DIR, file))
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing temp file {file}: {str(e)}"
+                        )
+
+                # Clean uploaded video in uploads directory
+                if os.path.exists(video_path):
+                    try:
+                        os.remove(video_path)
+                        logger.info(
+                            f"[Job {job_id}] Removed original upload file: {video_path}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing upload file: {str(e)}"
+                        )
+
+            except Exception as e:
+                logger.error(f"[Job {job_id}] Error during cleanup: {str(e)}")
+
             # Mark job as completed
             logger.info(f"[Job {job_id}] Processing completed successfully")
             update_job_status(
@@ -982,6 +1097,7 @@ async def continue_video_processing(
                 finished_at=datetime.now().isoformat(),
                 video_path=f"/media/outputs/{job_id}_output.mp4",
                 audio_path=f"/media/outputs/{job_id}_audio_only.mp3",
+                srt_path=f"/media/outputs/{job_id}_subtitles.srt",
                 speed_factor=speed_factor,
                 current_activity="Processing completed successfully",
             )
@@ -1170,6 +1286,49 @@ async def process_speed_adjustment(
             video_clip.close()
             final_clip.close()
 
+            # Copy SRT file to outputs folder with speed adjustment info in the filename
+            # First check if there's an existing SRT in outputs from the original processing
+            original_srt_path = os.path.join(OUTPUT_DIR, f"{job_id}_subtitles.srt")
+            if os.path.exists(original_srt_path):
+                try:
+                    adjusted_srt_path = os.path.join(
+                        OUTPUT_DIR, f"{job_id}_speed_{speed_factor}_subtitles.srt"
+                    )
+                    shutil.copy2(original_srt_path, adjusted_srt_path)
+                    logger.info(
+                        f"[Job {job_id}] Copied SRT file for speed adjusted version: {adjusted_srt_path}"
+                    )
+
+                    # Update SRT path in job record
+                    jobs[job_id][
+                        "srt_path"
+                    ] = f"/media/outputs/{job_id}_speed_{speed_factor}_subtitles.srt"
+                except Exception as e:
+                    logger.error(
+                        f"[Job {job_id}] Error copying SRT file for speed adjustment: {str(e)}"
+                    )
+
+            # Clean up temporary files created during speed adjustment
+            try:
+                logger.info(
+                    f"[Job {job_id}] Cleaning up temporary files from speed adjustment"
+                )
+
+                # Clean temporary files in temp directory related to this speed adjustment
+                temp_job_files = [
+                    f for f in os.listdir(TEMP_DIR) if job_id in f and "temp_audio" in f
+                ]
+                for file in temp_job_files:
+                    try:
+                        os.remove(os.path.join(TEMP_DIR, file))
+                    except Exception as e:
+                        logger.error(
+                            f"[Job {job_id}] Error removing temp file {file}: {str(e)}"
+                        )
+
+            except Exception as e:
+                logger.error(f"[Job {job_id}] Error during cleanup: {str(e)}")
+
             # Update job status with new paths
             update_job_status(
                 job_id,
@@ -1212,12 +1371,43 @@ async def get_file_path(file_type: str, job_id: str):
             "audio_path"
         )  # Should be like /media/outputs/filename.mp3
     elif file_type == "srt":
-        abs_srt_path = job_data.get(
-            "srt_path"
-        )  # This is stored as an absolute system path
+        # First check if there's an SRT path stored in the job record
+        abs_srt_path = job_data.get("srt_path")
         if abs_srt_path:
+            # Check if it's already a relative media URL
+            if abs_srt_path.startswith("/media/"):
+                return {"path": abs_srt_path}
+
+            # Otherwise, convert to a relative URL
             filename = os.path.basename(abs_srt_path)
-            path_value = f"/media/temp/{filename}"  # Convert to relative URL /media/temp/filename.srt
+            # Determine if it's in outputs or temp directory
+            if os.path.exists(os.path.join(OUTPUT_DIR, filename)):
+                path_value = f"/media/outputs/{filename}"
+            else:
+                path_value = f"/media/temp/{filename}"
+        else:
+            # Try to find an SRT file for this job
+            # First check outputs directory (preferred)
+            output_srt = os.path.join(OUTPUT_DIR, f"{job_id}_subtitles.srt")
+            if os.path.exists(output_srt):
+                path_value = f"/media/outputs/{job_id}_subtitles.srt"
+            else:
+                # Then check temp directory
+                temp_srt = os.path.join(TEMP_DIR, f"{job_id}_subtitles.srt")
+                if os.path.exists(temp_srt):
+                    path_value = f"/media/temp/{job_id}_subtitles.srt"
+                else:
+                    # Also check for speed-adjusted SRT files
+                    speed_factor = job_data.get("speed_factor", 1.0)
+                    speed_srt = os.path.join(
+                        OUTPUT_DIR, f"{job_id}_speed_{speed_factor}_subtitles.srt"
+                    )
+                    if os.path.exists(speed_srt):
+                        path_value = f"/media/outputs/{job_id}_speed_{speed_factor}_subtitles.srt"
+                    else:
+                        raise HTTPException(
+                            status_code=404, detail="SRT file not found for this job"
+                        )
     else:
         raise HTTPException(
             status_code=400, detail="Invalid file type. Use 'video', 'audio', or 'srt'"

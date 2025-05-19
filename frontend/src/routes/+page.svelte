@@ -11,7 +11,7 @@
   
   // State
   let apiKey = '';
-  let selectedVoiceId = '21m00Tcm4TlvDq8ikWAM'; // Default Rachel voice
+  let selectedVoiceId = 'uYkKk3J4lEp7IHQ8CLBi'; // Default Justin voice
   let activeWebSockets = {};
   let showTranscriptionEditor = false;
   let transcriptionJob = null;
