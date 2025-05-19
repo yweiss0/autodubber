@@ -42,10 +42,10 @@
         return;
       }
       
-      // Check file size (100MB limit)
-      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+      // Check file size (2000MB limit)
+      const maxSize = 2000 * 1024 * 1024; // 2000MB in bytes
       if (file.size > maxSize) {
-        error = 'File is too large. Maximum size is 100MB.';
+        error = 'File is too large. Maximum size is 2GB.';
         file = null;
         return;
       }
@@ -210,7 +210,7 @@
                 Browse Files
               </span>
             </p>
-            <p class="mt-2 text-xs text-gray-500">MP4, MOV, WEBM, or AVI (Max. 100MB)</p>
+            <p class="mt-2 text-xs text-gray-500">MP4, MOV, WEBM, or AVI (Max. 2GB)</p>
           </div>
         </label>
       </div>
@@ -245,7 +245,8 @@
             disabled={uploading}
           />
           <p class="text-xs text-gray-500 mt-2 italic">
-            Speed affects how fast the generated voice will speak. Normal speed is 100%.
+            Speed affects how fast the generated voice will speak. Normal speed is 100%. 
+            <span class="font-bold text-gray-500">Set your desired speed now, as this is the only place to adjust it.</span>
           </p>
         </div>
         

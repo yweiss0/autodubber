@@ -309,12 +309,12 @@
 </script>
 
 <svelte:head>
-  <title>AutoDubber - AI Video Voiceover</title>
+  <title>AutoVoiceOver - AI Video Voiceover</title>
 </svelte:head>
 
 <div class="max-w-6xl mx-auto">
   <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
-    <h1 class="text-2xl font-bold text-gray-800 mb-4">AutoDubber</h1>
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">AutoVoiceOver</h1>
     <p class="text-gray-600 mb-2">
       Upload a video, and we'll replace the audio with a high-quality ElevenLabs voiceover.
     </p>

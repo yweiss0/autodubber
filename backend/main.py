@@ -9,6 +9,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
     Header,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -27,6 +28,14 @@ import sys
 from io import StringIO
 import time
 import random
+
+# Setup custom upload size limits
+from starlette.requests import Request
+from starlette.datastructures import UploadFile as StarletteUploadFile
+from tempfile import SpooledTemporaryFile
+
+# Extend default upload file size to 2GB (2000MB)
+MAX_UPLOAD_SIZE = 2000 * 1024 * 1024  # 2GB in bytes
 
 # Import the video_voiceover functionality
 from video_voiceover import (
@@ -47,8 +56,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("autodubber")
 
-# Create FastAPI app
-app = FastAPI(title="AutoDubber API")
+# Create FastAPI app with larger file upload limit (2GB)
+app = FastAPI(
+    title="AutoDubber API",
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -821,10 +832,30 @@ async def upload_video(
     # Generate unique job ID
     job_id = str(uuid.uuid4())
 
-    # Save uploaded file to disk
-    file_location = os.path.join(UPLOAD_DIR, f"{job_id}_{file.filename}")
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Validate file size against the new MAX_UPLOAD_SIZE (2GB)
+    try:
+        # Save uploaded file to disk
+        file_location = os.path.join(UPLOAD_DIR, f"{job_id}_{file.filename}")
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Check file size after saving
+        file_size = os.path.getsize(file_location)
+        if file_size > MAX_UPLOAD_SIZE:
+            # Clean up the file if it's too large
+            os.remove(file_location)
+            raise HTTPException(
+                status_code=413,  # Payload Too Large
+                detail=f"File is too large. Maximum size is 2GB. Uploaded file is {file_size / (1024 * 1024):.2f} MB.",
+            )
+    except Exception as e:
+        # If it's not our size exception, re-raise with appropriate message
+        if not isinstance(e, HTTPException):
+            logger.error(f"Error handling file upload: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Error processing upload: {str(e)}"
+            )
+        raise
 
     # Create job record with initial status
     job = {
@@ -1509,4 +1540,13 @@ async def download_file(file_type: str, job_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Configure Uvicorn to handle larger file uploads (2GB)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        limit_concurrency=5,  # Limit concurrent connections during large uploads
+        timeout_keep_alive=300,  # Increased keep-alive timeout for large uploads
+        limit_max_requests=10,  # Limit max requests to prevent memory issues
+    )

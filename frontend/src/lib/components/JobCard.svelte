@@ -255,7 +255,8 @@
   $: isError = job.status === 'error';
   $: needsTranscriptionReview = job.status === 'transcription_complete';
   $: isProcessing = !isCompleted && !isError && job.status !== 'transcription_complete';
-  $: showSpeedControl = isCompleted && !isAdjustingSpeed;
+  // Only show speed control before processing starts - not on completed jobs
+  $: showSpeedControl = false;
   
   // Define processing stages in order
   const processingStages = [
