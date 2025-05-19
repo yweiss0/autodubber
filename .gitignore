@@ -22,9 +22,10 @@ frontend/.wrangler
 frontend/.svelte-kit
 frontend/build
 
-# Media files
-backend/media/*
-!backend/media/.gitkeep
+# Media files - keep folders but ignore contents
+backend/media/uploads/*
+backend/media/outputs/*
+backend/media/temp/*
 !backend/media/uploads/.gitkeep
 !backend/media/outputs/.gitkeep
 !backend/media/temp/.gitkeep
