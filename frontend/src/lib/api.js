@@ -114,6 +114,23 @@ export const updateTranscription = async (jobId, transcription) => {
 };
 
 /**
+ * Confirm transcription without editing it
+ * @param {string} jobId - The job ID
+ * @returns {Promise<Object>} - Response
+ */
+export const confirmTranscription = async (jobId) => {
+  // Fetch the original transcription first
+  const job = await fetchJob(jobId);
+  
+  if (!job.transcription) {
+    throw new Error('No transcription available to confirm');
+  }
+  
+  // Submit the original transcription without changes
+  return updateTranscription(jobId, job.transcription);
+};
+
+/**
  * Adjust the speed of audio for a job
  * @param {string} jobId - The job ID
  * @param {number} speedFactor - The speed factor (1.0 is normal speed)

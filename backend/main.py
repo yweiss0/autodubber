@@ -1442,6 +1442,70 @@ async def get_file_path(file_type: str, job_id: str):
     return {"path": path_value}
 
 
+@app.get("/download/{file_type}/{job_id}")
+async def download_file(file_type: str, job_id: str):
+    """Download a file with proper Content-Disposition header to force download."""
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get the file path
+    try:
+        path_result = await get_file_path(file_type, job_id)
+        path_value = path_result["path"]
+    except HTTPException as e:
+        raise e
+
+    # Convert relative URL to local file path
+    if path_value.startswith("/media/"):
+        relative_path = path_value.replace("/media/", "")
+        file_path = os.path.join(os.getcwd(), "media", relative_path)
+    else:
+        raise HTTPException(
+            status_code=500, detail=f"Invalid path format: {path_value}"
+        )
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+
+    # Determine filename based on job data and file type
+    job_data = jobs[job_id]
+    original_filename = job_data.get("filename", "download")
+    basename = os.path.splitext(original_filename)[0]
+
+    if file_type == "video":
+        if "speed" in path_value:
+            # Extract speed factor from path
+            speed_match = re.search(r"speed_([0-9.]+)_", path_value)
+            speed = speed_match.group(1) if speed_match else "adjusted"
+            filename = f"{basename}_speed_{speed}_voiceover.mp4"
+        else:
+            filename = f"{basename}_voiceover.mp4"
+    elif file_type == "audio":
+        if "speed" in path_value:
+            speed_match = re.search(r"speed_([0-9.]+)_", path_value)
+            speed = speed_match.group(1) if speed_match else "adjusted"
+            filename = f"{basename}_speed_{speed}_audio.mp3"
+        else:
+            filename = f"{basename}_audio.mp3"
+    elif file_type == "srt":
+        if "speed" in path_value:
+            speed_match = re.search(r"speed_([0-9.]+)_", path_value)
+            speed = speed_match.group(1) if speed_match else "adjusted"
+            filename = f"{basename}_speed_{speed}_subtitles.srt"
+        else:
+            filename = f"{basename}_subtitles.srt"
+    else:
+        filename = os.path.basename(file_path)
+
+    # Return file with headers that force download
+    return FileResponse(
+        path=file_path,
+        media_type="application/octet-stream",  # This will force download
+        filename=filename,  # This will be the downloaded filename
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 
