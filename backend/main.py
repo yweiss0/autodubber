@@ -49,6 +49,9 @@ from video_voiceover import (
     VOICE_SETTINGS,
 )
 
+# Import ElevenLabs SDK
+from elevenlabs import set_api_key
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -424,6 +427,12 @@ async def process_video(
             # Step 3: Generate TTS for each segment
             os.environ["ELEVENLABS_API_KEY"] = elevenlabs_api_key
 
+            # Ensure ElevenLabs SDK uses the new key
+            try:
+                set_api_key(elevenlabs_api_key)
+            except Exception:
+                pass
+
             # Log a masked version of the API key for debugging
             masked_key = (
                 elevenlabs_api_key[:4]
@@ -608,7 +617,13 @@ def is_valid_elevenlabs_api_key(api_key):
 # Endpoints
 @app.get("/")
 async def read_root():
-    return {"message": "Welcome to AutoDubber API"}
+    return {"message": "AutoDubber API is running"}
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker"""
+    return {"status": "healthy", "service": "autodubber-backend"}
 
 
 @app.websocket("/ws/{job_id}")
@@ -728,7 +743,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
 # Websocket keep-alive ping function
 async def keep_connection_alive(websocket: WebSocket, job_id: str):
     """Send periodic pings to keep WebSocket connection alive"""
-    ping_interval = 5  # seconds (reduced from 10s for more frequent pings)
+    ping_interval = 3  # seconds (reduced from 5s for more frequent pings in Docker)
     try:
         while True:
             await asyncio.sleep(ping_interval)
@@ -754,15 +769,10 @@ async def keep_connection_alive(websocket: WebSocket, job_id: str):
                         }
                     )
 
-                    # For jobs in progress, periodically resend the full job state
+                    # For jobs in progress, always send the full job state
                     # This helps ensure frontend stays in sync
-                    if (
-                        current_status not in ["completed", "error"]
-                        and random.random() < 0.3
-                    ):  # 30% chance
-                        logger.debug(
-                            f"Sending periodic full state update for job {job_id}"
-                        )
+                    if current_status not in ["completed", "error"]:
+                        logger.debug(f"Sending full state update for job {job_id}")
                         await websocket.send_json(jobs[job_id])
                 else:
                     # Simple ping if no job data
@@ -974,6 +984,12 @@ async def continue_video_processing(
             # Step 3: Generate TTS for each segment
             os.environ["ELEVENLABS_API_KEY"] = elevenlabs_api_key
 
+            # Ensure ElevenLabs SDK uses the new key
+            try:
+                set_api_key(elevenlabs_api_key)
+            except Exception:
+                pass
+
             # Log a masked version of the API key for debugging
             masked_key = (
                 elevenlabs_api_key[:4]
@@ -1166,6 +1182,12 @@ async def get_voices(elevenlabs_api_key: str = Header(None, alias="xi-api-key"))
 
         # Temporarily set the API key in the environment
         os.environ["ELEVENLABS_API_KEY"] = elevenlabs_api_key
+
+        # Ensure ElevenLabs SDK uses the new key
+        try:
+            set_api_key(elevenlabs_api_key)
+        except Exception:
+            pass
 
         # Log a masked version of the API key for debugging
         masked_key = (

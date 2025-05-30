@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autodubber-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount media directory for persistent storage
+      - ./backend/media:/app/media
+      # Commented out live code mount to prevent autoreload loops; enable only if actively developing backend code
+      # - ./backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - DEV_RELOAD=0
+    networks:
+      - autodubber-network
+    restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: autodubber-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reload in development
+      - ./frontend:/app
+      # Use anonymous volume for node_modules to prevent conflicts
+      - /app/node_modules
+      # Ensure .svelte-kit directory is writable
+      - /app/.svelte-kit
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - autodubber-network
+    restart: unless-stopped
+
+networks:
+  autodubber-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16 

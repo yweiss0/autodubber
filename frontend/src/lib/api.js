@@ -199,8 +199,8 @@ export const createJobWebSocket = (jobId, onMessage, onClose) => {
   
   // Variables for automatic reconnection
   let reconnectAttempts = 0;
-  const maxReconnectAttempts = 10; // Increased from 5 to 10
-  const reconnectInterval = 2000; // Reduced from 3000 to 2000 ms for faster reconnection
+  const maxReconnectAttempts = 15; // Increased from 10 to 15 for Docker
+  const reconnectInterval = 1500; // Reduced for faster reconnection
   let reconnectTimeout = null;
   let pingInterval = null;
   let lastMessageTime = Date.now();
@@ -240,7 +240,7 @@ export const createJobWebSocket = (jobId, onMessage, onClose) => {
           console.warn("Error closing old socket:", e);
         }
       }
-    }, reconnectInterval * Math.min(reconnectAttempts, 3)); // Gradually increase reconnect time
+    }, reconnectInterval * Math.min(reconnectAttempts, 2)); // Faster reconnect time for Docker
   };
   
   // Function to monitor connection health
@@ -255,8 +255,8 @@ export const createJobWebSocket = (jobId, onMessage, onClose) => {
       const now = Date.now();
       const elapsed = now - lastMessageTime;
       
-      // If it's been more than 15 seconds since last message, try to reconnect
-      if (elapsed > 15000 && socket.readyState === WebSocket.OPEN) {
+      // If it's been more than 10 seconds since last message, try to reconnect (reduced from 15)
+      if (elapsed > 10000 && socket.readyState === WebSocket.OPEN) {
         console.warn(`No messages received for ${elapsed/1000}s, sending ping to check connection`);
         try {
           // Try to send a ping to verify connection
@@ -267,12 +267,12 @@ export const createJobWebSocket = (jobId, onMessage, onClose) => {
         }
       }
       
-      // If it's been more than 30 seconds with no activity, force reconnect
-      if (elapsed > 30000) {
+      // If it's been more than 20 seconds with no activity, force reconnect (reduced from 30)
+      if (elapsed > 20000) {
         console.error(`No messages received for ${elapsed/1000}s, forcing reconnect`);
         socket.close();
       }
-    }, 5000); // Check every 5 seconds
+    }, 3000); // Check more frequently (3 seconds)
   };
   
   socket.onopen = () => {

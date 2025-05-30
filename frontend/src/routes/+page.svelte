@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { jobs, loadJobs, addJob, updateJob, selectedJobForTranscription } from '$lib/stores';
+  import { jobs, loadJobs, addJob, updateJob, selectedJobForTranscription, jobsLoading } from '$lib/stores';
   import { createJobWebSocket } from '$lib/api';
   
   import ApiKeyInput from '$lib/components/ApiKeyInput.svelte';
@@ -17,6 +17,8 @@
   let transcriptionJob = null;
   let loading = true;
   let socketMessageCounts = {}; // Track WebSocket message counts per job
+  let loadRetryCount = 0;
+  const MAX_RETRIES = 3;
   
   // Debug log when apiKey changes
   $: console.log(`Main page apiKey updated (length: ${apiKey.length})`);
@@ -263,43 +265,68 @@
     });
   }
   
-  // Load jobs and set up WebSockets on mount
+  // Load initial data
   onMount(async () => {
+    console.log('Component mounted, loading jobs...');
     loading = true;
+    
     try {
-      await loadJobs();
-      console.log(`Loaded ${$jobs.length} jobs from server`);
-      
-      // Connect to WebSockets for running jobs
-      $jobs.forEach(job => {
-        if (job.status !== 'completed' && job.status !== 'error') {
-          console.log(`Setting up WebSocket for running job: ${job.job_id} (status: ${job.status})`);
-          connectToJobWebSocket(job.job_id);
-        }
-      });
-      
-      // Set up periodic health check for WebSockets
-      const healthCheckInterval = setInterval(checkWebSocketHealth, 10000);
-      
-      return () => {
-        clearInterval(healthCheckInterval);
-      };
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-      showNotification('error', 'Error', 'Failed to load existing jobs.');
+      await loadInitialData();
+    } catch (e) {
+      console.error('Error loading initial data:', e);
+      showNotification('error', 'Error Loading Jobs', 'Could not load jobs. Please try refreshing the page.');
     } finally {
       loading = false;
     }
   });
   
-  // Clean up WebSockets on destroy
+  // Load initial data with retry logic
+  const loadInitialData = async () => {
+    try {
+      const jobsData = await loadJobs();
+      console.log(`Loaded ${jobsData.length} jobs`);
+      
+      // Create WebSocket connections for in-progress jobs
+      const inProgressJobs = jobsData.filter(job => 
+        job.status !== 'completed' && 
+        job.status !== 'error'
+      );
+      
+      if (inProgressJobs.length > 0) {
+        console.log(`Found ${inProgressJobs.length} in-progress jobs, connecting WebSockets`);
+        inProgressJobs.forEach(job => {
+          connectToJobWebSocket(job.job_id);
+        });
+      }
+      
+      return jobsData;
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      loadRetryCount++;
+      
+      if (loadRetryCount < MAX_RETRIES) {
+        console.log(`Retrying load (attempt ${loadRetryCount + 1}/${MAX_RETRIES})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * loadRetryCount));
+        return loadInitialData();
+      } else {
+        console.error(`Failed to load jobs after ${MAX_RETRIES} attempts`);
+        throw error;
+      }
+    }
+  };
+  
+  // Clean up on component destroy
   onDestroy(() => {
     console.log(`Cleaning up ${Object.keys(activeWebSockets).length} WebSocket connections`);
+    // Close all WebSocket connections
     Object.values(activeWebSockets).forEach(socket => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
+      try {
         socket.close();
+      } catch (e) {
+        console.warn("Error closing WebSocket:", e);
       }
     });
+    activeWebSockets = {};
   });
   
   // Computed properties

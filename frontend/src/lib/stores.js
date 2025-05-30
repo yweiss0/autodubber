@@ -1,15 +1,49 @@
 import { writable } from 'svelte/store';
-import { fetchJobs } from './api';
+import { fetchJobs, fetchJob } from './api';
+import { browser } from '$app/environment';
+
+// Constants for local storage
+const RECENT_JOBS_KEY = 'autodubber_recent_jobs';
+const MAX_RECENT_JOBS = 20;
+
+// Load recent job IDs from local storage
+const loadRecentJobIds = () => {
+  if (!browser) return [];
+  try {
+    const recentJobs = JSON.parse(localStorage.getItem(RECENT_JOBS_KEY) || '[]');
+    return Array.isArray(recentJobs) ? recentJobs : [];
+  } catch (e) {
+    console.error('Error loading recent jobs from localStorage:', e);
+    return [];
+  }
+};
+
+// Save recent job IDs to local storage
+const saveRecentJobIds = (jobIds) => {
+  if (!browser) return;
+  try {
+    // Keep only the most recent MAX_RECENT_JOBS jobs
+    const recentJobs = jobIds.slice(0, MAX_RECENT_JOBS);
+    localStorage.setItem(RECENT_JOBS_KEY, JSON.stringify(recentJobs));
+  } catch (e) {
+    console.error('Error saving recent jobs to localStorage:', e);
+  }
+};
 
 // Jobs store
 export const jobs = writable([]);
+
+// Store for tracking if jobs are currently loading
+export const jobsLoading = writable(false);
 
 // Selected job for transcription editing
 export const selectedJobForTranscription = writable(null);
 
 // Load jobs from API
 export const loadJobs = async () => {
+  jobsLoading.set(true);
   try {
+    // First try to get all jobs from the API
     const jobsData = await fetchJobs();
     
     // Convert from object to array and sort by creation date (newest first)
@@ -17,17 +51,94 @@ export const loadJobs = async () => {
       new Date(b.created_at) - new Date(a.created_at)
     );
     
+    // If we didn't get any jobs from the API or got an error,
+    // try to load individual jobs from the recent jobs list
+    if (jobsArray.length === 0) {
+      const recentJobIds = loadRecentJobIds();
+      console.log(`No jobs returned from API. Trying to load ${recentJobIds.length} recent jobs from local storage.`);
+      
+      if (recentJobIds.length > 0) {
+        const loadedJobs = [];
+        
+        // Try to load each job individually
+        for (const jobId of recentJobIds) {
+          try {
+            const job = await fetchJob(jobId);
+            if (job && job.job_id) {
+              loadedJobs.push(job);
+            }
+          } catch (err) {
+            console.warn(`Could not load job ${jobId}:`, err);
+          }
+        }
+        
+        if (loadedJobs.length > 0) {
+          // Sort by creation date (newest first)
+          loadedJobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          jobs.set(loadedJobs);
+          jobsLoading.set(false);
+          return loadedJobs;
+        }
+      }
+    }
+    
     jobs.set(jobsArray);
+    jobsLoading.set(false);
     return jobsArray;
   } catch (error) {
     console.error('Error loading jobs:', error);
+    
+    // On error, try to load individual jobs from recent list
+    try {
+      const recentJobIds = loadRecentJobIds();
+      console.log(`Error loading jobs from API. Trying to load ${recentJobIds.length} recent jobs from local storage.`);
+      
+      if (recentJobIds.length > 0) {
+        const loadedJobs = [];
+        
+        // Try to load each job individually
+        for (const jobId of recentJobIds) {
+          try {
+            const job = await fetchJob(jobId);
+            if (job && job.job_id) {
+              loadedJobs.push(job);
+            }
+          } catch (err) {
+            console.warn(`Could not load job ${jobId}:`, err);
+          }
+        }
+        
+        if (loadedJobs.length > 0) {
+          // Sort by creation date (newest first)
+          loadedJobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          jobs.set(loadedJobs);
+          jobsLoading.set(false);
+          return loadedJobs;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading recent jobs:', e);
+    }
+    
+    jobsLoading.set(false);
     return [];
   }
 };
 
 // Add a new job to the store
 export const addJob = (job) => {
+  if (!job || !job.job_id) return;
+  
   jobs.update(currentJobs => [job, ...currentJobs]);
+  
+  // Add to recent jobs in local storage
+  if (browser) {
+    const recentJobIds = loadRecentJobIds();
+    // Remove this job ID if it already exists to avoid duplicates
+    const filteredIds = recentJobIds.filter(id => id !== job.job_id);
+    // Add to the beginning of the array
+    saveRecentJobIds([job.job_id, ...filteredIds]);
+  }
 };
 
 // Update a job in the store
@@ -50,6 +161,16 @@ export const updateJob = (updatedJob) => {
     // If job doesn't exist, add it
     if (existingJobIndex === -1) {
       console.log(`Job ${updatedJob.job_id} not found in store, adding it`);
+      
+      // Also add to recent jobs in local storage
+      if (browser) {
+        const recentJobIds = loadRecentJobIds();
+        // Remove this job ID if it already exists to avoid duplicates
+        const filteredIds = recentJobIds.filter(id => id !== updatedJob.job_id);
+        // Add to the beginning of the array
+        saveRecentJobIds([updatedJob.job_id, ...filteredIds]);
+      }
+      
       return [updatedJob, ...currentJobs];
     }
     

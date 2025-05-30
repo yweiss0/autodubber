@@ -17,9 +17,12 @@ if not ELEVENLABS_API_KEY:
         "Please create a .env file with your API key or set it as an environment variable."
     )
     print("Example: ELEVENLABS_API_KEY=your_api_key_here")
-    sys.exit(1)
+    # Set a dummy key to prevent module import failure
+    ELEVENLABS_API_KEY = "dummy_key_will_be_replaced_at_runtime"
 
-set_api_key(ELEVENLABS_API_KEY)
+# Only set the API key if it's not a dummy
+if ELEVENLABS_API_KEY != "dummy_key_will_be_replaced_at_runtime":
+    set_api_key(ELEVENLABS_API_KEY)
 
 # Default voice ID - Justin
 DEFAULT_VOICE_ID = "uYkKk3J4lEp7IHQ8CLBi"  # Justin voice ID
