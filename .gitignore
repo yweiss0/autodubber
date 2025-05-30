@@ -55,3 +55,5 @@ vite.config.ts.timestamp-*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log* 
+
+ready_to_send/
