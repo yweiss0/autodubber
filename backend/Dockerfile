@@ -6,7 +6,15 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
+    imagemagick \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure ImageMagick policy to allow MoviePy operations
+RUN sed -i 's/rights="none" pattern="@\*"/rights="read|write" pattern="@*"/' /etc/ImageMagick-6/policy.xml && \
+    sed -i 's/rights="none" pattern="PS"/rights="read|write" pattern="PS"/' /etc/ImageMagick-6/policy.xml && \
+    sed -i 's/rights="none" pattern="EPS"/rights="read|write" pattern="EPS"/' /etc/ImageMagick-6/policy.xml && \
+    sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml && \
+    sed -i 's/rights="none" pattern="XPS"/rights="read|write" pattern="XPS"/' /etc/ImageMagick-6/policy.xml
 
 # Set working directory
 WORKDIR /app

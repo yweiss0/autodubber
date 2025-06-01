@@ -30,15 +30,17 @@ export const fetchVoices = async (apiKey) => {
  * @param {string} voiceId - The ElevenLabs voice ID to use
  * @param {string} apiKey - The ElevenLabs API key
  * @param {number} speedFactor - The speed factor (0.7-1.2, 1.0 is normal)
+ * @param {boolean} burnSubtitles - Whether to burn subtitles into the video
  * @returns {Promise<Object>} - Job details
  */
-export const uploadVideo = async (file, voiceId, apiKey, speedFactor = 1.0) => {
-  console.log(`Uploading video with API key (${apiKey.length} characters), voice ID: ${voiceId}, speed: ${speedFactor}`);
+export const uploadVideo = async (file, voiceId, apiKey, speedFactor = 1.0, burnSubtitles = true) => {
+  console.log(`Uploading video with API key (${apiKey.length} characters), voice ID: ${voiceId}, speed: ${speedFactor}, burn subtitles: ${burnSubtitles}`);
   
   const formData = new FormData();
   formData.append('file', file);
   formData.append('voice_id', voiceId);
   formData.append('speed_factor', speedFactor);
+  formData.append('burn_subtitles', burnSubtitles);
   // Keeping for backward compatibility but prefer header
   formData.append('elevenlabs_api_key', apiKey);
   

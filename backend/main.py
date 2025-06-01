@@ -100,6 +100,7 @@ class Job(BaseModel):
     transcription: Optional[List[Dict[str, Any]]] = None
     voice_id: Optional[str] = None
     speed_factor: float = 1.0
+    burn_subtitles: bool = True
     current_activity: Optional[str] = None  # Added field for detailed status message
 
 
@@ -351,6 +352,7 @@ async def process_video(
     voice_id: str,
     elevenlabs_api_key: str,
     speed_factor: float = 1.0,
+    burn_subtitles: bool = True,
 ):
     """Process the uploaded video in the background."""
     # Set up progress capture
@@ -513,7 +515,16 @@ async def process_video(
             await asyncio.sleep(0.1)
 
             output_video_path = os.path.join(OUTPUT_DIR, f"{job_id}_output.mp4")
-            create_final_video(video_path, voiceover_track, output_video_path)
+            srt_path = os.path.join(TEMP_DIR, f"{job_id}_subtitles.srt")
+
+            # Debug logging
+            logger.info(
+                f"[Job {job_id}] Calling create_final_video with burn_subtitles={burn_subtitles}, srt_path={srt_path}, srt_exists={os.path.exists(srt_path)}"
+            )
+
+            create_final_video(
+                video_path, voiceover_track, output_video_path, burn_subtitles, srt_path
+            )
 
             # Allow other tasks to run
             await asyncio.sleep(0.1)
@@ -796,6 +807,7 @@ async def upload_video(
     voice_id: str = Form("uYkKk3J4lEp7IHQ8CLBi"),  # Justin voice default
     elevenlabs_api_key: str = Form(None),
     speed_factor: float = Form(1.0),  # Default speed factor (1.0 = normal speed)
+    burn_subtitles: bool = Form(True),  # Default to burn subtitles
     xi_api_key: str = Header(None, alias="xi-api-key"),
 ):
     # Use the header API key if provided, otherwise fall back to form data
@@ -821,7 +833,7 @@ async def upload_video(
         else "***"
     )
     logger.info(
-        f"Upload video with ElevenLabs API Key: {masked_key}, speed factor: {speed_factor}"
+        f"Upload video with ElevenLabs API Key: {masked_key}, speed factor: {speed_factor}, burn subtitles: {burn_subtitles}"
     )
 
     # Validate API key
@@ -876,6 +888,7 @@ async def upload_video(
         "created_at": datetime.now().isoformat(),
         "voice_id": voice_id,
         "speed_factor": speed_factor,
+        "burn_subtitles": burn_subtitles,
         "current_activity": "File uploaded, waiting to start processing",
         "_elevenlabs_api_key": api_key,  # Store API key for later use (secure in production)
     }
@@ -886,7 +899,13 @@ async def upload_video(
 
     # Start background processing
     background_tasks.add_task(
-        process_video, job_id, file_location, voice_id, api_key, speed_factor
+        process_video,
+        job_id,
+        file_location,
+        voice_id,
+        api_key,
+        speed_factor,
+        burn_subtitles,
     )
 
     logger.info(f"Started background processing for job {job_id}")
@@ -936,6 +955,7 @@ async def update_job_transcription(job_id: str, transcription: List[Dict[str, An
     job_data = jobs[job_id]
     voice_id = job_data.get("voice_id")
     speed_factor = job_data.get("speed_factor", 1.0)
+    burn_subtitles = job_data.get("burn_subtitles", True)
 
     # Get the video path
     video_path = None
@@ -963,6 +983,7 @@ async def update_job_transcription(job_id: str, transcription: List[Dict[str, An
             elevenlabs_api_key,
             speed_factor,
             transcription,
+            burn_subtitles,
         )
     )
 
@@ -976,6 +997,7 @@ async def continue_video_processing(
     elevenlabs_api_key: str,
     speed_factor: float = 1.0,
     transcription: List[Dict[str, Any]] = None,
+    burn_subtitles: bool = True,
 ):
     """Continue processing the video after transcription has been confirmed."""
     # Set up progress capture
@@ -1073,7 +1095,10 @@ async def continue_video_processing(
             await asyncio.sleep(0.1)
 
             output_video_path = os.path.join(OUTPUT_DIR, f"{job_id}_output.mp4")
-            create_final_video(video_path, voiceover_track, output_video_path)
+            srt_path = os.path.join(TEMP_DIR, f"{job_id}_subtitles.srt")
+            create_final_video(
+                video_path, voiceover_track, output_video_path, burn_subtitles, srt_path
+            )
 
             # Allow other tasks to run
             await asyncio.sleep(0.1)

@@ -259,9 +259,29 @@ def create_composite_voiceover(tts_clips_info, total_duration):
     return composite_audio
 
 
-def create_final_video(original_video_path, voiceover_audio_clip, output_video_path):
-    """Create final video with new audio"""
+def create_final_video(
+    original_video_path,
+    voiceover_audio_clip,
+    output_video_path,
+    burn_subtitles=False,
+    srt_path=None,
+):
+    """Create final video with new audio and optionally burn subtitles"""
     print(f"PROGRESS_UPDATE: Creating final video with voiceover: {output_video_path}")
+
+    # Debug logging
+    print(f"PROGRESS_UPDATE: burn_subtitles={burn_subtitles}, srt_path={srt_path}")
+    if srt_path:
+        print(f"PROGRESS_UPDATE: SRT file exists: {os.path.exists(srt_path)}")
+
+    if burn_subtitles and srt_path and os.path.exists(srt_path):
+        print(
+            f"PROGRESS_UPDATE: Subtitle burning enabled - will embed subtitles from {srt_path}"
+        )
+    else:
+        print(
+            f"PROGRESS_UPDATE: Subtitle burning skipped - burn_subtitles={burn_subtitles}, srt_path={srt_path}, exists={os.path.exists(srt_path) if srt_path else False}"
+        )
     try:
         print(
             f"PROGRESS_UPDATE: Loading original video for processing: {original_video_path}"
@@ -287,6 +307,139 @@ def create_final_video(original_video_path, voiceover_audio_clip, output_video_p
                 f"PROGRESS_UPDATE: Trimming audio to match video duration ({final_video.duration:.2f}s)"
             )
             final_video.audio = final_video.audio.subclip(0, final_video.duration)
+
+        # Add subtitles if requested
+        if burn_subtitles and srt_path and os.path.exists(srt_path):
+            print(f"PROGRESS_UPDATE: Burning subtitles into video from {srt_path}")
+            try:
+                # Parse SRT file manually for better control
+                def parse_srt(srt_path):
+                    """Parse SRT file and return list of subtitle segments"""
+                    print(f"PROGRESS_UPDATE: Parsing SRT file: {srt_path}")
+                    subtitles = []
+                    with open(srt_path, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+
+                    print(
+                        f"PROGRESS_UPDATE: SRT file content length: {len(content)} characters"
+                    )
+                    blocks = content.split("\n\n")
+                    print(f"PROGRESS_UPDATE: Found {len(blocks)} subtitle blocks")
+
+                    for block in blocks:
+                        lines = block.strip().split("\n")
+                        if len(lines) >= 3:
+                            # Parse time format: 00:00:01,000 --> 00:00:04,000
+                            time_line = lines[1]
+                            if " --> " in time_line:
+                                start_str, end_str = time_line.split(" --> ")
+
+                                def time_to_seconds(time_str):
+                                    """Convert SRT time format to seconds"""
+                                    time_str = time_str.replace(",", ".")
+                                    parts = time_str.split(":")
+                                    hours = int(parts[0])
+                                    minutes = int(parts[1])
+                                    seconds = float(parts[2])
+                                    return hours * 3600 + minutes * 60 + seconds
+
+                                start_time = time_to_seconds(start_str)
+                                end_time = time_to_seconds(end_str)
+                                text = "\n".join(lines[2:])
+
+                                subtitles.append(
+                                    {"start": start_time, "end": end_time, "text": text}
+                                )
+
+                    print(
+                        f"PROGRESS_UPDATE: Successfully parsed {len(subtitles)} subtitle segments"
+                    )
+                    return subtitles
+
+                # Parse subtitles
+                subtitles = parse_srt(srt_path)
+
+                if subtitles:
+                    print(
+                        f"PROGRESS_UPDATE: Importing moviepy components for subtitle rendering"
+                    )
+                    from moviepy.video.VideoClip import TextClip, ColorClip
+                    from moviepy.video.compositing.CompositeVideoClip import (
+                        CompositeVideoClip,
+                    )
+
+                    # Create subtitle clips
+                    subtitle_clips = []
+                    for i, sub in enumerate(subtitles):
+                        print(
+                            f"PROGRESS_UPDATE: Creating subtitle clip {i+1}/{len(subtitles)}: '{sub['text'][:50]}...'"
+                        )
+                        try:
+                            # Create white text with NO stroke and NO background
+                            txt_clip = TextClip(
+                                sub["text"],
+                                fontsize=50,
+                                color="white",  # White text
+                                stroke_color=None,  # NO stroke
+                                stroke_width=0,  # NO stroke width
+                                font="Arial",
+                                method="caption",
+                                size=(int(final_video.w * 0.8), None),
+                            )
+
+                            # Create black background strip slightly larger than text
+                            margin = 20  # pixels of margin around text
+                            bg_width = txt_clip.w + (margin * 2)
+                            bg_height = txt_clip.h + (margin * 2)
+
+                            # Create solid black background
+                            black_bg = ColorClip(
+                                size=(bg_width, bg_height),
+                                color=(0, 0, 0),  # Pure black
+                                duration=sub["end"] - sub["start"],
+                            )
+
+                            # Position white text centered on black background
+                            txt_positioned = txt_clip.set_position(("center", "center"))
+
+                            # Composite white text on black background
+                            subtitle_clip = (
+                                CompositeVideoClip([black_bg, txt_positioned])
+                                .set_start(sub["start"])
+                                .set_duration(sub["end"] - sub["start"])
+                                .set_position(("center", "bottom"))
+                            )
+
+                            subtitle_clips.append(subtitle_clip)
+                            print(
+                                f"PROGRESS_UPDATE: Successfully created subtitle clip {i+1} with white text on black background strip"
+                            )
+                        except Exception as clip_error:
+                            print(
+                                f"ERROR: Failed to create subtitle clip {i+1}: {str(clip_error)}"
+                            )
+
+                    # Composite video with subtitles
+                    if subtitle_clips:
+                        print(
+                            f"PROGRESS_UPDATE: Compositing video with {len(subtitle_clips)} subtitle clips"
+                        )
+                        final_video = CompositeVideoClip([final_video] + subtitle_clips)
+                        print(
+                            f"PROGRESS_UPDATE: Successfully burned {len(subtitle_clips)} subtitle segments into video"
+                        )
+                    else:
+                        print(f"PROGRESS_UPDATE: No subtitle clips created to burn")
+                else:
+                    print(f"PROGRESS_UPDATE: No subtitles parsed from SRT file")
+
+            except Exception as e:
+                print(f"ERROR: Failed to burn subtitles: {str(e)}")
+                import traceback
+
+                print(f"ERROR: Subtitle burning traceback: {traceback.format_exc()}")
+                print(f"PROGRESS_UPDATE: Continuing without subtitles...")
+                # Continue without subtitles if burning fails
 
         # Write the result to a file
         print("PROGRESS_UPDATE: Encoding final video (this may take a while)...")
@@ -434,7 +587,9 @@ if __name__ == "__main__":
                 )
 
             # 5. Create final video
-            create_final_video(input_video, voiceover_track, output_video)
+            create_final_video(
+                input_video, voiceover_track, output_video, args.srt, srt_path
+            )
 
         except Exception as e:
             print(f"Error: {str(e)}")

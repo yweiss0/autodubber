@@ -18,6 +18,7 @@
   let uploadIconAnimating = false;
   let speedFactor = 1.0; // Default speed factor
   let isDragOver = false;
+  let burnSubtitles = true; // Default to enabled
   
   // Events
   const dispatch = createEventDispatcher();
@@ -104,7 +105,7 @@
       const progressInterval = simulateUploadProgress();
       
       // Call the API to upload the file
-      const result = await uploadVideo(file, voiceId, apiKey, speedFactor);
+      const result = await uploadVideo(file, voiceId, apiKey, speedFactor, burnSubtitles);
       
       // Ensure progress bar reaches 100%
       uploadProgress = 100;
@@ -247,6 +248,24 @@
           <p class="text-xs text-gray-500 mt-2 italic">
             Speed affects how fast the generated voice will speak. Normal speed is 100%. 
             <span class="font-bold text-gray-500">Set your desired speed now, as this is the only place to adjust it.</span>
+          </p>
+        </div>
+        
+        <!-- Burn subtitles checkbox -->
+        <div class="mt-4 border-t border-gray-200 pt-4">
+          <label class="flex items-center">
+            <input 
+              type="checkbox" 
+              bind:checked={burnSubtitles}
+              disabled={uploading}
+              class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
+            />
+            <span class="ml-2 text-sm text-gray-700">
+              Burn subtitles into video <span class="text-indigo-600 font-medium">(Recommended)</span>
+            </span>
+          </label>
+          <p class="text-xs text-gray-500 mt-1 ml-6 italic">
+            When enabled, subtitles will be permanently embedded in the video with white text on black background for maximum visibility.
           </p>
         </div>
         
