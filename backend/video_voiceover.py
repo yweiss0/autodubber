@@ -312,105 +312,58 @@ def create_final_video(
         if burn_subtitles and srt_path and os.path.exists(srt_path):
             print(f"PROGRESS_UPDATE: Burning subtitles into video from {srt_path}")
             try:
-                # Parse SRT file manually for better control
-                def parse_srt(srt_path):
-                    """Parse SRT file and return list of subtitle segments"""
-                    print(f"PROGRESS_UPDATE: Parsing SRT file: {srt_path}")
-                    subtitles = []
-                    with open(srt_path, "r", encoding="utf-8") as f:
-                        content = f.read().strip()
-
-                    print(
-                        f"PROGRESS_UPDATE: SRT file content length: {len(content)} characters"
-                    )
-                    blocks = content.split("\n\n")
-                    print(f"PROGRESS_UPDATE: Found {len(blocks)} subtitle blocks")
-
-                    for block in blocks:
-                        lines = block.strip().split("\n")
-                        if len(lines) >= 3:
-                            # Parse time format: 00:00:01,000 --> 00:00:04,000
-                            time_line = lines[1]
-                            if " --> " in time_line:
-                                start_str, end_str = time_line.split(" --> ")
-
-                                def time_to_seconds(time_str):
-                                    """Convert SRT time format to seconds"""
-                                    time_str = time_str.replace(",", ".")
-                                    parts = time_str.split(":")
-                                    hours = int(parts[0])
-                                    minutes = int(parts[1])
-                                    seconds = float(parts[2])
-                                    return hours * 3600 + minutes * 60 + seconds
-
-                                start_time = time_to_seconds(start_str)
-                                end_time = time_to_seconds(end_str)
-                                text = "\n".join(lines[2:])
-
-                                subtitles.append(
-                                    {"start": start_time, "end": end_time, "text": text}
-                                )
-
-                    print(
-                        f"PROGRESS_UPDATE: Successfully parsed {len(subtitles)} subtitle segments"
-                    )
-                    return subtitles
-
-                # Parse subtitles
+                # Parse SRT file manually (your existing parse_srt function is fine)
                 subtitles = parse_srt(srt_path)
 
                 if subtitles:
                     print(
                         f"PROGRESS_UPDATE: Importing moviepy components for subtitle rendering"
                     )
-                    from moviepy.video.VideoClip import TextClip, ColorClip
+                    # ColorClip is no longer needed for this method of subtitle background
+                    from moviepy.video.VideoClip import TextClip
+
+                    # CompositeVideoClip is still needed to overlay subtitles onto the main video
                     from moviepy.video.compositing.CompositeVideoClip import (
                         CompositeVideoClip,
                     )
 
-                    # Create subtitle clips
                     subtitle_clips = []
                     for i, sub in enumerate(subtitles):
                         print(
                             f"PROGRESS_UPDATE: Creating subtitle clip {i+1}/{len(subtitles)}: '{sub['text'][:50]}...'"
                         )
                         try:
-                            # Create white text with NO stroke and NO background
-                            txt_clip = TextClip(
+                            # Create TextClip with white text and a black background strip
+                            # The bg_color parameter handles the background directly.
+                            # The 'size' parameter in 'caption' method defines the width of this strip.
+                            # The height will be automatic based on the text.
+                            subtitle_text_clip = TextClip(
                                 sub["text"],
-                                fontsize=50,
-                                color="white",  # White text
-                                stroke_color=None,  # NO stroke
-                                stroke_width=0,  # NO stroke width
-                                font="Arial",
-                                method="caption",
-                                size=(int(final_video.w * 0.8), None),
+                                fontsize=50,  # Adjust as needed
+                                color="white",  # Text color
+                                bg_color="black",  # Background color of the strip
+                                font="Arial",  # Ensure this font is available
+                                method="caption",  # Wraps text to fit the width
+                                size=(
+                                    int(final_video.w * 0.8),
+                                    None,
+                                ),  # Width of caption box, height is auto
+                                align="center",  # Center-align text within the caption box (for multi-line)
+                                # stroke_color=None, # Explicitly no stroke (should be default)
+                                # stroke_width=0,    # Explicitly no stroke width (should be default)
                             )
 
-                            # Create black background strip slightly larger than text
-                            margin = 20  # pixels of margin around text
-                            bg_width = txt_clip.w + (margin * 2)
-                            bg_height = txt_clip.h + (margin * 2)
-
-                            # Create solid black background
-                            black_bg = ColorClip(
-                                size=(bg_width, bg_height),
-                                color=(0, 0, 0),  # Pure black
-                                duration=sub["end"] - sub["start"],
-                            )
-
-                            # Position white text centered on black background
-                            txt_positioned = txt_clip.set_position(("center", "center"))
-
-                            # Composite white text on black background
-                            subtitle_clip = (
-                                CompositeVideoClip([black_bg, txt_positioned])
-                                .set_start(sub["start"])
+                            # Set the start time, duration, and position of the subtitle clip
+                            # The entire clip (text + its black background) is positioned.
+                            positioned_subtitle_clip = (
+                                subtitle_text_clip.set_start(sub["start"])
                                 .set_duration(sub["end"] - sub["start"])
-                                .set_position(("center", "bottom"))
+                                .set_position(
+                                    ("center", "bottom")
+                                )  # Position strip at center bottom
                             )
 
-                            subtitle_clips.append(subtitle_clip)
+                            subtitle_clips.append(positioned_subtitle_clip)
                             print(
                                 f"PROGRESS_UPDATE: Successfully created subtitle clip {i+1} with white text on black background strip"
                             )
@@ -418,18 +371,28 @@ def create_final_video(
                             print(
                                 f"ERROR: Failed to create subtitle clip {i+1}: {str(clip_error)}"
                             )
+                            # It's helpful to see the full traceback for clip creation errors
+                            import traceback
+
+                            print(
+                                f"ERROR_DETAILS (clip creation): {traceback.format_exc()}"
+                            )
+                            continue  # Skip this problematic subtitle clip
 
                     # Composite video with subtitles
                     if subtitle_clips:
                         print(
                             f"PROGRESS_UPDATE: Compositing video with {len(subtitle_clips)} subtitle clips"
                         )
+                        # Add subtitle clips on top of the existing final_video (which has the new audio)
                         final_video = CompositeVideoClip([final_video] + subtitle_clips)
                         print(
                             f"PROGRESS_UPDATE: Successfully burned {len(subtitle_clips)} subtitle segments into video"
                         )
                     else:
-                        print(f"PROGRESS_UPDATE: No subtitle clips created to burn")
+                        print(
+                            f"PROGRESS_UPDATE: No subtitle clips created to burn (either no subtitles in SRT or all failed)"
+                        )
                 else:
                     print(f"PROGRESS_UPDATE: No subtitles parsed from SRT file")
 
@@ -439,11 +402,11 @@ def create_final_video(
 
                 print(f"ERROR: Subtitle burning traceback: {traceback.format_exc()}")
                 print(f"PROGRESS_UPDATE: Continuing without subtitles...")
-                # Continue without subtitles if burning fails
+                # Video will be created without subtitles if burning process fails
 
-        # Write the result to a file
+        # ... (rest of the function: write_videofile, cleanup) ...
         print("PROGRESS_UPDATE: Encoding final video (this may take a while)...")
-        final_video.write_videofile(
+        final_video.write_videofile(  # This final_video object now includes subtitles if they were added
             output_video_path,
             codec="libx264",
             audio_codec="aac",
