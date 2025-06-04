@@ -341,7 +341,10 @@
 
 <div class="max-w-6xl mx-auto">
   <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
-    <h1 class="text-2xl font-bold text-gray-800 mb-4">AutoVoiceOver</h1>
+    <div class="flex items-center">
+      <img src="/favicon.png" alt="Favicon" class="h-24 w-32 mr-2" />
+      <h1 class="text-2xl font-bold text-gray-800 mb-0 flex items-center">AutoVoiceOver</h1>
+    </div>
     <p class="text-gray-600 mb-2">
       Upload a video, and we'll replace the audio with a high-quality ElevenLabs voiceover.
     </p>
